@@ -24,8 +24,8 @@ impl ManagedResource {
 
 pub trait ManagedWorld {
     fn initialize_managed_world(&mut self);
-    fn create_managed_entity(&self) -> EntityBuilder;
-    fn push_state(&self);
+    fn create_managed_entity(&mut self) -> EntityBuilder;
+    fn push_state(&mut self);
     fn pop_state(&mut self);
 }
 
@@ -34,11 +34,11 @@ impl ManagedWorld for World {
         self.res.entry::<ManagedResource>().or_insert_with(|| ManagedResource::default());
     }
 
-    fn create_managed_entity(&self) -> EntityBuilder {
+    fn create_managed_entity(&mut self) -> EntityBuilder {
         self.write_resource::<ManagedResource>().create_entity(self)
     }
 
-    fn push_state(&self) {
+    fn push_state(&mut self) {
         self.write_resource::<ManagedResource>().push_state();
     }
 
