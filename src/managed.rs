@@ -1,8 +1,8 @@
 use amethyst::prelude::*;
-use amethyst::ecs::{Entity, EntityBuilder};
+use amethyst::ecs::{Entity, EntityBuilder, Write, world::{EntitiesRes, EntityResBuilder}};
 
 #[derive(Default)]
-struct ManagedResource {
+pub struct ManagedResource {
     states: Vec<Vec<Entity>>,
 }
 
@@ -19,6 +19,10 @@ impl ManagedResource {
         let builder = world.create_entity_unchecked();
         self.states.last_mut().expect("There is no active state").push(builder.entity);
         builder
+    }
+
+    fn push_entity(&mut self, entity: Entity) {
+        self.states.last_mut().expect("There is no active state").push(entity);
     }
 }
 
@@ -45,5 +49,30 @@ impl ManagedWorld for World {
     fn pop_state(&mut self) {
         let entities = self.write_resource::<ManagedResource>().pop_state();
         self.delete_entities(&entities).unwrap_or(());
+    }
+}
+
+// TODO see if we cannot implement the Managed resource as Read with interior mutability safely so
+//      that it can be used from multiple systems at once.
+/// A wrapper for the Managed resource, needs the Entities resource to create managed entities.
+/// type SystemData = (Entities<'a>, Managed<'a>);
+pub type Managed<'a> = Write<'a, ManagedResource>;
+
+impl ManagedResource {
+    pub fn create_managed(&mut self, entities: &EntitiesRes) -> Entity {
+        let entity = entities.create();
+        self.push_entity(entity);
+
+        entity
+    }
+
+    // TODO implement create_managed_iter
+    //pub fn create_managed_iter(&mut self, entities: &EntitiesRes) -> CreateManagedIter
+
+    pub fn build_managed_entity<'a>(&mut self, entities: &'a EntitiesRes) -> EntityResBuilder<'a> {
+        let builder = entities.build_entity();
+        self.push_entity(builder.entity);
+
+        builder
     }
 }
