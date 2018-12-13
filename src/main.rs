@@ -14,7 +14,6 @@ struct Example;
 
 impl SimpleState for Example {
     fn on_start(&mut self, data: StateData<GameData>) {
-        data.world.initialize_managed_world();
         data.world.push_state();
     }
 
