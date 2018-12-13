@@ -4,21 +4,37 @@ use amethyst::{
     prelude::*,
     renderer::{DisplayConfig, DrawFlat, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::application_root_dir,
+    ecs::{System},
 };
 
 mod managed;
 
 use crate::managed::ManagedWorld;
+use crate::managed::ManagedEntities;
+use crate::managed::Managed;
 
 struct Example;
 
 impl SimpleState for Example {
     fn on_start(&mut self, data: StateData<GameData>) {
         data.world.push_state();
+        data.world.create_managed_entity().build();
+        data.world.create_managed_entity().build();
+        data.world.create_entity().build();
     }
 
     fn on_stop(&mut self, data: StateData<GameData>) {
         data.world.pop_state();
+    }
+}
+
+pub struct ExampleSystem;
+
+impl<'a> System<'a> for ExampleSystem {
+    type SystemData = Managed<'a>;
+
+    fn run(&mut self, (managed_resource, entities, mut managed_storage): Self::SystemData) {
+        (managed_resource, entities).create_managed(&mut managed_storage);
     }
 }
 
@@ -38,7 +54,8 @@ fn main() -> amethyst::Result<()> {
     );
 
     let game_data =
-        GameDataBuilder::default().with_bundle(RenderBundle::new(pipe, Some(config)))?;
+        GameDataBuilder::default().with_bundle(RenderBundle::new(pipe, Some(config)))?
+            .with(ExampleSystem, "example_system", &[]);
 
     let mut game = Application::new("./", Example, game_data)?;
 

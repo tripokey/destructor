@@ -1,28 +1,33 @@
 use amethyst::prelude::*;
-use amethyst::ecs::{Entity, EntityBuilder, Write, world::{EntitiesRes, EntityResBuilder}};
+use amethyst::ecs::{
+    Join, Component, EntityBuilder, DenseVecStorage, ReadStorage, Entities, Entity, Read, WriteStorage,
+    world::EntityResBuilder,
+};
+
+pub struct ManagedComponent {
+    owning_state: usize,
+}
+
+impl Component for ManagedComponent {
+    type Storage = DenseVecStorage<Self>;
+}
 
 #[derive(Default)]
 pub struct ManagedResource {
-    states: Vec<Vec<Entity>>,
+    active_state: usize,
 }
 
 impl ManagedResource {
     fn push_state(&mut self) {
-        self.states.push(Vec::default());
+        self.active_state += 1;
     }
 
-    fn pop_state(&mut self) -> Vec<Entity> {
-        self.states.pop().expect("There is no active state")
-    }
+    fn pop_state(&mut self) -> usize {
+        assert!(self.active_state > 0);
+        let prev_state = self.active_state;
+        self.active_state -= 1;
 
-    fn create_entity<'a>(&mut self, world: &'a World) -> EntityBuilder<'a> {
-        let builder = world.create_entity_unchecked();
-        self.states.last_mut().expect("There is no active state").push(builder.entity);
-        builder
-    }
-
-    fn push_entity(&mut self, entity: Entity) {
-        self.states.last_mut().expect("There is no active state").push(entity);
+        prev_state
     }
 }
 
@@ -34,41 +39,58 @@ pub trait ManagedWorld {
 
 impl ManagedWorld for World {
     fn create_managed_entity(&mut self) -> EntityBuilder {
-        self.write_resource::<ManagedResource>().create_entity(self)
+        self.register::<ManagedComponent>();
+        let active_state = self.read_resource::<ManagedResource>().active_state;
+        self.create_entity().with(ManagedComponent { owning_state: active_state })
     }
 
     fn push_state(&mut self) {
-        self.res.entry::<ManagedResource>().or_insert_with(|| ManagedResource::default()).push_state();
+        self.res.entry::<ManagedResource>().or_insert_with(|| ManagedResource{active_state: 0}).push_state();
     }
 
     fn pop_state(&mut self) {
-        let entities = self.write_resource::<ManagedResource>().pop_state();
-        self.delete_entities(&entities).unwrap_or(());
+        let stale_state = self.write_resource::<ManagedResource>().pop_state();
+        self.exec(|(owning_states, entities): (ReadStorage<ManagedComponent>, Entities)| {
+            for (owning_state, entity) in (&owning_states, &*entities).join() {
+                if owning_state.owning_state == stale_state {
+                    entities.delete(entity).expect("Failed to delete entity");
+                }
+            }
+        });
     }
 }
 
-// TODO implement Managed exactly like Entities so that it can be used as Read
-// TODO implement world managed_maintain that first handles all the managed entities created
-// and then goes on to call world::maintain
-/// A wrapper for the Managed resource, needs the Entities resource to create managed entities.
-/// type SystemData = (Entities<'a>, Managed<'a>);
-pub type Managed<'a> = Write<'a, ManagedResource>;
+pub type Managed<'a> = (
+    Read<'a, ManagedResource>,
+    Entities<'a>,
+    WriteStorage<'a, ManagedComponent>
+);
 
-impl ManagedResource {
-    pub fn create_managed(&mut self, entities: &EntitiesRes) -> Entity {
-        let entity = entities.create();
-        self.push_entity(entity);
+pub trait ManagedEntities {
+    fn create_managed(&self, storage: &mut WriteStorage<ManagedComponent>) -> Entity;
+    fn build_managed_entity(&self, storage: &mut WriteStorage<ManagedComponent>) -> EntityResBuilder;
+}
 
-        entity
+impl ManagedEntities for (Read<'_, ManagedResource>, Entities<'_>) {
+    fn create_managed(&self, storage: &mut WriteStorage<ManagedComponent>) -> Entity {
+        self.build_managed_entity(storage).build()
     }
 
-    // TODO implement create_managed_iter
-    //pub fn create_managed_iter(&mut self, entities: &EntitiesRes) -> CreateManagedIter
+    fn build_managed_entity(&self, storage: &mut WriteStorage<ManagedComponent>) -> EntityResBuilder {
+        let (managed_resource, entities) = self;
 
-    pub fn build_managed_entity<'a>(&mut self, entities: &'a EntitiesRes) -> EntityResBuilder<'a> {
-        let builder = entities.build_entity();
-        self.push_entity(builder.entity);
+        entities.build_entity().with(ManagedComponent { owning_state: managed_resource.active_state }, storage)
+    }
+}
 
-        builder
+impl ManagedEntities for (Entities<'_>, Read<'_, ManagedResource>) {
+    fn create_managed(&self, storage: &mut WriteStorage<ManagedComponent>) -> Entity {
+        self.build_managed_entity(storage).build()
+    }
+
+    fn build_managed_entity(&self, storage: &mut WriteStorage<ManagedComponent>) -> EntityResBuilder {
+        let (entities, managed_resource) = self;
+
+        entities.build_entity().with(ManagedComponent { owning_state: managed_resource.active_state }, storage)
     }
 }
