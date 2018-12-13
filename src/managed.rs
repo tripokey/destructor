@@ -47,8 +47,9 @@ impl ManagedWorld for World {
     }
 }
 
-// TODO see if we cannot implement the Managed resource as Read with interior mutability safely so
-//      that it can be used from multiple systems at once.
+// TODO implement Managed exactly like Entities so that it can be used as Read
+// TODO implement world managed_maintain that first handles all the managed entities created
+// and then goes on to call world::maintain
 /// A wrapper for the Managed resource, needs the Entities resource to create managed entities.
 /// type SystemData = (Entities<'a>, Managed<'a>);
 pub type Managed<'a> = Write<'a, ManagedResource>;
