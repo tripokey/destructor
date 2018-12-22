@@ -53,12 +53,6 @@ impl<'a> System<'a> for ExampleSystem {
     ) {
         println!("ExampleSystem::run");
 
-        let mut wrong_count = 0;
-        for _ in entities.join() {
-            wrong_count = wrong_count + 1;
-        }
-        println!("Number of entities wrong {}", wrong_count);
-
         let mut alive_count = 0;
         for (_, _) in (&entities, &alive).join() {
             alive_count = alive_count + 1;
@@ -66,7 +60,7 @@ impl<'a> System<'a> for ExampleSystem {
         println!("Number of entities alive {}", alive_count);
 
         let mut entity_count = 0;
-        for (_, _) in (&entities, &alive).join() {
+        for _ in (&entities).join() {
             entity_count = entity_count + 1;
         }
         println!("Number of entities {}", entity_count);
