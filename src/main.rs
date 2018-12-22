@@ -28,7 +28,6 @@ impl SimpleState for Example {
         data.world.push_state();
         data.world.create_managed_entity().with(Alive).build();
         data.world.create_managed_entity().with(Alive).build();
-        data.world.create_entity().build();
     }
 
     fn on_stop(&mut self, data: StateData<GameData>) {
