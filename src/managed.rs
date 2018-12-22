@@ -1,4 +1,7 @@
-use amethyst::ecs::{world::EntityResBuilder, Entities, Entity, EntityBuilder, Read, WriteStorage};
+use amethyst::ecs::{
+    world::{EntitiesRes, EntityResBuilder},
+    Entity, EntityBuilder, Read, WriteStorage,
+};
 use amethyst::prelude::*;
 use amethyst::utils::removal::{exec_removal, Removal};
 
@@ -64,49 +67,20 @@ impl ManagedWorld for World {
     }
 }
 
-pub type Managed<'a> = (
-    Read<'a, ManagedResource>,
-    Entities<'a>,
-    WriteStorage<'a, Removal<usize>>,
-);
-
-pub trait ManagedEntities {
-    fn create_managed(&self, storage: &mut WriteStorage<Removal<usize>>) -> Entity;
-    fn build_managed_entity(&self, storage: &mut WriteStorage<Removal<usize>>) -> EntityResBuilder;
+pub fn build_managed_entity<'a>(
+    managed_resource: &Read<ManagedResource>,
+    entities: &'a EntitiesRes,
+    removal_storage: &mut WriteStorage<Removal<usize>>,
+) -> EntityResBuilder<'a> {
+    entities
+        .build_entity()
+        .with(Removal::new(managed_resource.active_state), removal_storage)
 }
 
-impl ManagedEntities for (Read<'_, ManagedResource>, Entities<'_>) {
-    fn create_managed(&self, storage: &mut WriteStorage<Removal<usize>>) -> Entity {
-        self.build_managed_entity(storage).build()
-    }
-
-    fn build_managed_entity(&self, storage: &mut WriteStorage<Removal<usize>>) -> EntityResBuilder {
-        let (managed_resource, entities) = self;
-
-        println!(
-            "Create system entity for state {}",
-            managed_resource.active_state
-        );
-        entities
-            .build_entity()
-            .with(Removal::new(managed_resource.active_state), storage)
-    }
-}
-
-impl ManagedEntities for (Entities<'_>, Read<'_, ManagedResource>) {
-    fn create_managed(&self, storage: &mut WriteStorage<Removal<usize>>) -> Entity {
-        self.build_managed_entity(storage).build()
-    }
-
-    fn build_managed_entity(&self, storage: &mut WriteStorage<Removal<usize>>) -> EntityResBuilder {
-        let (entities, managed_resource) = self;
-
-        println!(
-            "Create system entity for state {}",
-            managed_resource.active_state
-        );
-        entities
-            .build_entity()
-            .with(Removal::new(managed_resource.active_state), storage)
-    }
+pub fn create_managed_entity(
+    managed_resource: &Read<ManagedResource>,
+    entities: &EntitiesRes,
+    removal_storage: &mut WriteStorage<Removal<usize>>,
+) -> Entity {
+    build_managed_entity(managed_resource, entities, removal_storage).build()
 }

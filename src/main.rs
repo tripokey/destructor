@@ -1,24 +1,19 @@
 extern crate amethyst;
 
 use amethyst::{
-    ecs::{Component, Join, NullStorage, System, WriteStorage},
+    ecs::{Entities, Join, Read, System, WriteStorage},
     prelude::*,
     renderer::{DisplayConfig, DrawFlat, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::application_root_dir,
+    utils::removal::Removal,
 };
 
 mod managed;
 
-use crate::managed::Managed;
-use crate::managed::ManagedEntities;
+use crate::managed::build_managed_entity;
+use crate::managed::create_managed_entity;
+use crate::managed::ManagedResource;
 use crate::managed::ManagedWorld;
-
-#[derive(Default)]
-pub struct Alive;
-
-impl Component for Alive {
-    type Storage = NullStorage<Self>;
-}
 
 struct Example;
 
@@ -26,8 +21,8 @@ impl SimpleState for Example {
     fn on_start(&mut self, data: StateData<GameData>) {
         println!("Example::on_start");
         data.world.push_state();
-        data.world.create_managed_entity().with(Alive).build();
-        data.world.create_managed_entity().with(Alive).build();
+        data.world.create_managed_entity().build();
+        data.world.create_managed_entity().build();
     }
 
     fn on_stop(&mut self, data: StateData<GameData>) {
@@ -44,29 +39,21 @@ impl SimpleState for Example {
 pub struct ExampleSystem;
 
 impl<'a> System<'a> for ExampleSystem {
-    type SystemData = (Managed<'a>, WriteStorage<'a, Alive>);
-
-    fn run(
-        &mut self,
-        ((managed_resource, entities, mut managed_storage), mut alive): Self::SystemData,
-    ) {
+    type SystemData = (
+        Read<'a, ManagedResource>,
+        Entities<'a>,
+        WriteStorage<'a, Removal<usize>>,
+    );
+    fn run(&mut self, (managed_resource, entities, mut removal_storage): Self::SystemData) {
         println!("ExampleSystem::run");
-
-        let mut alive_count = 0;
-        for (_, _) in (&entities, &alive).join() {
-            alive_count = alive_count + 1;
-        }
-        println!("Number of entities alive {}", alive_count);
 
         let mut entity_count = 0;
         for _ in (&entities).join() {
             entity_count = entity_count + 1;
         }
         println!("Number of entities {}", entity_count);
-        (managed_resource, entities)
-            .build_managed_entity(&mut managed_storage)
-            .with(Alive, &mut alive)
-            .build();
+        build_managed_entity(&managed_resource, &entities, &mut removal_storage).build();
+        create_managed_entity(&managed_resource, &entities, &mut removal_storage);
     }
 }
 
