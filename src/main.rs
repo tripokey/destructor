@@ -1,22 +1,23 @@
 extern crate amethyst;
 
 use amethyst::{
+    ecs::{Join, System},
     prelude::*,
     renderer::{DisplayConfig, DrawFlat, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::application_root_dir,
-    ecs::{System},
 };
 
 mod managed;
 
-use crate::managed::ManagedWorld;
-use crate::managed::ManagedEntities;
 use crate::managed::Managed;
+use crate::managed::ManagedEntities;
+use crate::managed::ManagedWorld;
 
 struct Example;
 
 impl SimpleState for Example {
     fn on_start(&mut self, data: StateData<GameData>) {
+        println!("Example::on_start");
         data.world.push_state();
         data.world.create_managed_entity().build();
         data.world.create_managed_entity().build();
@@ -24,7 +25,13 @@ impl SimpleState for Example {
     }
 
     fn on_stop(&mut self, data: StateData<GameData>) {
+        println!("Example::on_stop");
         data.world.pop_state();
+    }
+
+    fn update(&mut self, _data: &mut StateData<GameData>) -> SimpleTrans {
+        println!("Example::update");
+        Trans::Switch(Box::new(Example))
     }
 }
 
@@ -34,6 +41,12 @@ impl<'a> System<'a> for ExampleSystem {
     type SystemData = Managed<'a>;
 
     fn run(&mut self, (managed_resource, entities, mut managed_storage): Self::SystemData) {
+        println!("ExampleSystem::run");
+        for entity in entities.join() {
+            if entities.is_alive(entity) {
+                println!("{:?}", entity);
+            }
+        }
         (managed_resource, entities).create_managed(&mut managed_storage);
     }
 }
@@ -41,10 +54,7 @@ impl<'a> System<'a> for ExampleSystem {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let path = format!(
-        "{}/resources/display_config.ron",
-        application_root_dir()
-    );
+    let path = format!("{}/resources/display_config.ron", application_root_dir());
     let config = DisplayConfig::load(&path);
 
     let pipe = Pipeline::build().with_stage(
@@ -53,9 +63,9 @@ fn main() -> amethyst::Result<()> {
             .with_pass(DrawFlat::<PosNormTex>::new()),
     );
 
-    let game_data =
-        GameDataBuilder::default().with_bundle(RenderBundle::new(pipe, Some(config)))?
-            .with(ExampleSystem, "example_system", &[]);
+    let game_data = GameDataBuilder::default()
+        .with_bundle(RenderBundle::new(pipe, Some(config)))?
+        .with(ExampleSystem, "example_system", &[]);
 
     let mut game = Application::new("./", Example, game_data)?;
 
