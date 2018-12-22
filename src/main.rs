@@ -1,7 +1,7 @@
 extern crate amethyst;
 
 use amethyst::{
-    ecs::{Join, System},
+    ecs::{Component, Join, NullStorage, ReadStorage, System},
     prelude::*,
     renderer::{DisplayConfig, DrawFlat, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::application_root_dir,
@@ -12,6 +12,13 @@ mod managed;
 use crate::managed::Managed;
 use crate::managed::ManagedEntities;
 use crate::managed::ManagedWorld;
+
+#[derive(Default)]
+pub struct Alive;
+
+impl Component for Alive {
+    type Storage = NullStorage<Self>;
+}
 
 struct Example;
 
@@ -38,15 +45,31 @@ impl SimpleState for Example {
 pub struct ExampleSystem;
 
 impl<'a> System<'a> for ExampleSystem {
-    type SystemData = Managed<'a>;
+    type SystemData = (Managed<'a>, ReadStorage<'a, Alive>);
 
-    fn run(&mut self, (managed_resource, entities, mut managed_storage): Self::SystemData) {
+    fn run(
+        &mut self,
+        ((managed_resource, entities, mut managed_storage), alive): Self::SystemData,
+    ) {
         println!("ExampleSystem::run");
-        for entity in entities.join() {
-            if entities.is_alive(entity) {
-                println!("{:?}", entity);
-            }
+
+        let mut wrong_count = 0;
+        for _ in entities.join() {
+            wrong_count = wrong_count + 1;
         }
+        println!("Number of entities wrong {}", wrong_count);
+
+        let mut alive_count = 0;
+        for (_, _) in (&entities, &alive).join() {
+            alive_count = alive_count + 1;
+        }
+        println!("Number of entities alive {}", alive_count);
+
+        let mut entity_count = 0;
+        for (_, _) in (&entities, &alive).join() {
+            entity_count = entity_count + 1;
+        }
+        println!("Number of entities {}", entity_count);
         (managed_resource, entities).create_managed(&mut managed_storage);
     }
 }
