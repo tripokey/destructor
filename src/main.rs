@@ -1,7 +1,7 @@
 extern crate amethyst;
 
 use amethyst::{
-    ecs::{Component, Join, NullStorage, ReadStorage, System},
+    ecs::{Component, Join, NullStorage, System, WriteStorage},
     prelude::*,
     renderer::{DisplayConfig, DrawFlat, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::application_root_dir,
@@ -26,8 +26,8 @@ impl SimpleState for Example {
     fn on_start(&mut self, data: StateData<GameData>) {
         println!("Example::on_start");
         data.world.push_state();
-        data.world.create_managed_entity().build();
-        data.world.create_managed_entity().build();
+        data.world.create_managed_entity().with(Alive).build();
+        data.world.create_managed_entity().with(Alive).build();
         data.world.create_entity().build();
     }
 
@@ -45,11 +45,11 @@ impl SimpleState for Example {
 pub struct ExampleSystem;
 
 impl<'a> System<'a> for ExampleSystem {
-    type SystemData = (Managed<'a>, ReadStorage<'a, Alive>);
+    type SystemData = (Managed<'a>, WriteStorage<'a, Alive>);
 
     fn run(
         &mut self,
-        ((managed_resource, entities, mut managed_storage), alive): Self::SystemData,
+        ((managed_resource, entities, mut managed_storage), mut alive): Self::SystemData,
     ) {
         println!("ExampleSystem::run");
 
@@ -64,7 +64,10 @@ impl<'a> System<'a> for ExampleSystem {
             entity_count = entity_count + 1;
         }
         println!("Number of entities {}", entity_count);
-        (managed_resource, entities).create_managed(&mut managed_storage);
+        (managed_resource, entities)
+            .build_managed_entity(&mut managed_storage)
+            .with(Alive, &mut alive)
+            .build();
     }
 }
 
